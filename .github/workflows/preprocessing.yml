@@ -1,0 +1,57 @@
+name: Data Preprocessing
+
+# Workflow ini HANYA menjalankan automate_siswa.py dan mengembalikan dataset terbaru.
+# Tidak ada proses retraining model di repositori ini.
+on:
+  push:
+    paths:
+      - "ai4i2020_raw/**"
+      - "preprocessing/automate_siswa.py"
+      - ".github/workflows/preprocessing.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preprocessing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preprocess:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install "pandas==2.2.3" "scikit-learn==1.5.2" "joblib==1.4.2"
+
+      - name: Run automate_siswa.py
+        run: |
+          python preprocessing/automate_siswa.py \
+            --input ai4i2020_raw/ai4i2020.csv \
+            --output-dir preprocessing/ai4i2020_preprocessing
+
+      - name: Upload preprocessing artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai4i2020-preprocessing
+          path: preprocessing/ai4i2020_preprocessing/
+
+      - name: Commit dataset terbaru kembali ke repositori
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add preprocessing/ai4i2020_preprocessing
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan hasil preprocessing."
+          else
+            git commit -m "chore(data): update hasil preprocessing otomatis"
+            git push
+          fi
